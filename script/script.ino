@@ -45,8 +45,6 @@ void setup_wifi() {
   Serial.println(WiFi.localIP());
 }
 
-// Single source of truth for the relay. Only acts on a real state change,
-// keeps pumpRunning in sync, stamps the run/soak timers, and reports via MQTT.
 void setPump(bool on) {
   if (on == pumpRunning) return;
   digitalWrite(PUMP_RELAY_PIN, on ? HIGH : LOW);
@@ -74,7 +72,7 @@ void reconnect() {
   while (!client.connected()) {
     Serial.print("Connecting to MQTT...");
 
-    if (client.connect("ESP32Client")) {
+    if (client.connect("ESP32Client", "smartgarden", "smartgarden")) {
       Serial.println("connected");
       // client.subscribe("smartgarden/auto");
       // client.subscribe("smartgarden/pump/set");
