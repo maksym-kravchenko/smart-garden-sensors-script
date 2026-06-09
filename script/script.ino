@@ -9,15 +9,15 @@
 #define PUMP_RELAY_PIN 26
 #define SOIL_DRY_THRESHOLD  30   // start watering below this %
 #define SOIL_WET_THRESHOLD  50   // stop once above this %
-#define PUMP_RUN_MS         10000   // water for 10 s per pulse
-#define PUMP_SOAK_MS        60000  // then wait 60 s before re-checking
+#define PUMP_RUN_MS 6000   // water for 6 s per pulse
+#define PUMP_SOAK_MS 60000  // then wait 60 s before re-checking
 
 bool pumpRunning = false;
 unsigned long pumpStartMs = 0;
 unsigned long pumpStopMs  = 0;
 
-bool autoMode     = true;    // true = soil-driven; later set from MQTT
-bool manualPumpOn = false;   // only used when autoMode == false; later from MQTT
+bool autoMode = true; 
+bool manualPumpOn = false;
 
 const char* ssid = "";
 const char* password = "";
