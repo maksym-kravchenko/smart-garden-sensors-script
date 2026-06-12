@@ -2,6 +2,7 @@
 #include <PubSubClient.h>
 #include <Wire.h>
 #include <BH1750.h>
+#include "secrets.h"  // ssid, password, mqtt_server (git-ignored)
 
 #define SOIL_PIN 34
 #define SDA_PIN 21
@@ -9,7 +10,7 @@
 #define PUMP_RELAY_PIN 26
 #define SOIL_DRY_THRESHOLD  30   // start watering below this %
 #define SOIL_WET_THRESHOLD  50   // stop once above this %
-#define PUMP_RUN_MS 6000   // water for 6 s per pulse
+#define PUMP_RUN_MS 5000   // water for 5 s per pulse
 #define PUMP_SOAK_MS 60000  // then wait 60 s before re-checking
 
 bool pumpRunning = false;
@@ -18,10 +19,6 @@ unsigned long pumpStopMs  = 0;
 
 bool autoMode = true; 
 bool manualPumpOn = false;
-
-const char* ssid = "";
-const char* password = "";
-const char* mqtt_server = "";
 
 WiFiClient espClient;
 PubSubClient client(espClient);
