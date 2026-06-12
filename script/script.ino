@@ -2,7 +2,7 @@
 #include <PubSubClient.h>
 #include <Wire.h>
 #include <BH1750.h>
-#include "secrets.h"  // ssid, password, mqtt_server (git-ignored)
+#include "secrets.h"
 
 #define SOIL_PIN 34
 #define SDA_PIN 21
@@ -51,15 +51,13 @@ void setPump(bool on) {
   client.publish("smartgarden/pump", on ? "on" : "off");
 }
 
-// For later, when MQTT is back on. Wire it up with client.setCallback(mqttCallback)
-// in setup() and subscribe to both topics inside reconnect().
 void mqttCallback(char* topic, byte* payload, unsigned int length) {
   String msg;
   for (unsigned int i = 0; i < length; i++) msg += (char)payload[i];
   String t = String(topic);
 
   if (t == "smartgarden/auto") {
-    autoMode = (msg == "true" || msg == "1");
+    autoMode = (msg == "true" || msg == "1" || msg == "auto");
   } else if (t == "smartgarden/pump/set") {
     manualPumpOn = (msg == "on" || msg == "1");
   }
@@ -71,8 +69,8 @@ void reconnect() {
 
     if (client.connect("ESP32Client", "smartgarden", "smartgarden")) {
       Serial.println("connected");
-      // client.subscribe("smartgarden/auto");
-      // client.subscribe("smartgarden/pump/set");
+      client.subscribe("smartgarden/auto");
+      client.subscribe("smartgarden/pump/set");
     } else {
       Serial.print("failed, rc=");
       Serial.print(client.state());
@@ -100,16 +98,16 @@ void setup() {
   analogReadResolution(12); // 0-4095
   Serial.println("System ready");
 
-  //setup_wifi();
-  //client.setServer(mqtt_server, 1883);
-  //client.setCallback(mqttCallback);
+  setup_wifi();
+  client.setServer(mqtt_server, 1883);
+  client.setCallback(mqttCallback);
 }
 
 void loop() {
-  //if (!client.connected()) {
-  //  reconnect();
-  //}
-  //client.loop();
+  if (!client.connected()) {
+    reconnect();
+  }
+  client.loop();
 
   // Soil sensor
   int soilRaw = analogRead(SOIL_PIN);
@@ -158,6 +156,7 @@ void loop() {
 
   client.publish("smartgarden/soil", soilString.c_str());
   client.publish("smartgarden/light", lightString.c_str());
+  client.publish("smartgarden/pump", pumpRunning ? "on" : "off");
 
   delay(2000);
 }
