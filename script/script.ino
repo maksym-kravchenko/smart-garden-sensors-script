@@ -2,16 +2,23 @@
 #include <PubSubClient.h>
 #include <Wire.h>
 #include <BH1750.h>
+#include <esp_system.h>
 #include "secrets.h"
 
 #define SOIL_PIN 34
+#define SOIL2_PIN 32
 #define SDA_PIN 21
 #define SCL_PIN 22
 #define PUMP_RELAY_PIN 26
 #define SOIL_DRY_THRESHOLD  30   // start watering below this %
 #define SOIL_WET_THRESHOLD  50   // stop once above this %
+#define TANK_WET_THRESHOLD  50   // tank sensor must read >= this % to allow pumping
+#define SOIL2_MIN_VALID_RAW 300  // below this raw = sensor 2 unplugged -> treat as 0%
 #define PUMP_RUN_MS 5000   // water for 5 s per pulse
 #define PUMP_SOAK_MS 60000  // then wait 60 s before re-checking
+
+const uint8_t TANK_STABLE_FRAMES = 3;   // ~6 s at 2 s/loop
+uint8_t tankOkCount = 0;
 
 bool pumpRunning = false;
 unsigned long pumpStartMs = 0;
@@ -96,18 +103,22 @@ void setup() {
   }
 
   analogReadResolution(12); // 0-4095
+
+  // Internal pull-down so an unplugged sensor 2 reads ~0 (tank "empty") instead of floating.
+  pinMode(SOIL2_PIN, INPUT_PULLDOWN);
+
   Serial.println("System ready");
 
-  setup_wifi();
-  client.setServer(mqtt_server, 1883);
-  client.setCallback(mqttCallback);
+ // setup_wifi();
+  //client.setServer(mqtt_server, 1883);
+  //client.setCallback(mqttCallback);
 }
 
 void loop() {
   if (!client.connected()) {
-    reconnect();
+    //reconnect();
   }
-  client.loop();
+  //client.loop();
 
   // Soil sensor
   int soilRaw = analogRead(SOIL_PIN);
@@ -115,9 +126,31 @@ void loop() {
   int soilPercent = map(soilRaw, 3500, 1500, 0, 100);
   soilPercent = constrain(soilPercent, 0, 100);
 
+  // Soil sensor 2
+  int soil2Raw = analogRead(SOIL2_PIN);
+
+  int soil2Percent = map(soil2Raw, 3500, 1500, 0, 100);
+  soil2Percent = constrain(soil2Percent, 0, 100);
+
+  // Fail-safe: unplugged sensor (pin pulled to ~0) force 0% so the pump stays off.
+  bool soil2Connected = (soil2Raw > SOIL2_MIN_VALID_RAW);
+  if (!soil2Connected) {
+    soil2Percent = 0;
+  }
+
   unsigned long now = millis();
 
-  if (autoMode) {
+  bool tankRaw = soil2Connected && (soil2Percent >= TANK_WET_THRESHOLD);
+  if (tankRaw) {
+    if (tankOkCount < TANK_STABLE_FRAMES) tankOkCount++;
+  } else {
+    tankOkCount = 0;
+  }
+  bool tankHasWater = (tankOkCount >= TANK_STABLE_FRAMES);
+
+  if (!tankHasWater) {
+    setPump(false);
+  } else if (autoMode) {
     // Soil-driven: pulse then soak
     if (pumpRunning) {
       if (now - pumpStartMs >= PUMP_RUN_MS) {   // pulse finished
@@ -146,7 +179,13 @@ void loop() {
   Serial.print(soilRaw);
   Serial.print(" | Soil %: ");
   Serial.print(soilPercent);
-  Serial.print("% | Light: ");
+  Serial.print("% | Soil2 Raw: ");
+  Serial.print(soil2Raw);
+  Serial.print(" | Soil2 %: ");
+  Serial.print(soil2Percent);
+  Serial.print("% | Tank: ");
+  Serial.print(!soil2Connected ? "NO SENSOR" : (tankHasWater ? "OK" : "EMPTY"));
+  Serial.print(" | Light: ");
   Serial.print(lux);
   Serial.println(" lux");
 
@@ -155,6 +194,7 @@ void loop() {
   String lightString = String(lux, 2);
 
   client.publish("smartgarden/soil", soilString.c_str());
+  client.publish("smartgarden/tank", tankHasWater ? "ok" : "empty");
   client.publish("smartgarden/light", lightString.c_str());
   client.publish("smartgarden/pump", pumpRunning ? "on" : "off");
 
