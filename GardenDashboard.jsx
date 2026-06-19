@@ -194,6 +194,13 @@ export default function GardenDashboard() {
   const soilColor = soil < 35 ? "#C9A24B" : palette.matcha;
   const pumpOn = status === "on";
 
+  // Hard guard: starting the pump is impossible while the tank is empty.
+  // Don't rely on the disabled <Switch> alone — the control path enforces it.
+  const setPump = (on) => {
+    if (on && waterLow) return;
+    setStatus(on ? "on" : "off");
+  };
+
   return (
     <div style={{ minHeight: "100vh",
       background: `radial-gradient(1200px 600px at 80% -10%, ${palette.matchaSoft} 0%, transparent 60%), linear-gradient(160deg, ${palette.bg1} 0%, ${palette.bg2} 100%)`,
@@ -306,7 +313,7 @@ export default function GardenDashboard() {
                 )}
               </div>
               <Switch on={pumpOn} disabled={waterLow}
-                onToggle={() => setStatus(pumpOn ? "off" : "on")} />
+                onToggle={() => setPump(!pumpOn)} />
             </div>
           )}
         </div>
