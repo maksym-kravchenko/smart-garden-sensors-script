@@ -1,0 +1,8 @@
+script/secrets.h
+.env
+
+build/
+.pio/
+*.bin
+*.elf
+*.hex
